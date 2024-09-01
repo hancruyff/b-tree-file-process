@@ -7,7 +7,7 @@
 
 [4. 결과](#4-결과)
 
-## 1. 🎮개요
+## 1. 🌳개요
 
 B+ 트리 구현
 
@@ -16,7 +16,7 @@ B+ 트리 구현
 ## 2. B+ 트리
 <img src="https://github.com/user-attachments/assets/23c7fe29-dddf-4b57-abe7-489a6ebda450" width="440" height="160"/>
 
-## 3. 주요 기능
+## 3. 🔧주요 기능
 
 i : (키,값)을 가지는 레코드 삽입
 
