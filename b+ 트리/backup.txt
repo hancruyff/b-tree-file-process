@@ -1,0 +1,8 @@
+1 lee
+2 kim
+5 son
+6 ko
+7 we
+9 kwon
+200 aa
+201 bb
