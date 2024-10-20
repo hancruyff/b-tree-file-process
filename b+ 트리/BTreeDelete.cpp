@@ -2,17 +2,17 @@
 extern BufferManager * bufferManager;
 extern BTreeHeader * bTreeHeader;
 void mergeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, STACK * stack);
-	/*¸®ÇÁ°¡ ¾Æ´Ñ ³ëµå¸¦ ÇÕº´*/
+	/*ë¦¬í”„ê°€ ì•„ë‹Œ ë…¸ë“œë¥¼ í•©ë³‘*/
 void mergeLeaf(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, STACK * stack); 
-	/*¸®ÇÁ ³ëµå¸¦ ÇÕº´*/
+	/*ë¦¬í”„ ë…¸ë“œë¥¼ í•©ë³‘*/
 BOOL redistributeLeaf(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, int i);
-	/*¸®ÇÁ°¡ ¾Æ´Ñ ³ëµå¸¦ ÀçºĞ¹è*/
+	/*ë¦¬í”„ê°€ ì•„ë‹Œ ë…¸ë“œë¥¼ ì¬ë¶„ë°°*/
 BOOL redistributeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, int i);
-	/*¸®ÇÁ ³ëµå¸¦ ÀçºĞ¹è*/ 
+	/*ë¦¬í”„ ë…¸ë“œë¥¼ ì¬ë¶„ë°°*/ 
 int selectSibling(BTreePagePtr sibling, BTreePagePtr parent, STACK * stack);
-	/*ÀçºĞ¹è¿¡ Âü¿©ÇÏ´Â ÇüÁ¦³ëµå¸¦ ¼±ÅÃÇÑ´Ù*/
+	/*ì¬ë¶„ë°°ì— ì°¸ì—¬í•˜ëŠ” í˜•ì œë…¸ë“œë¥¼ ì„ íƒí•œë‹¤*/
 BOOL deleteRecord(Key key){
-	/*key¸¦ °®´Â ·¹ÄÚµå »èÁ¦*/
+	/*keyë¥¼ ê°–ëŠ” ë ˆì½”ë“œ ì‚­ì œ*/
 	int i= 0;
 	BOOL finished= FALSE, ret;
 	STACK * stack;
@@ -30,7 +30,7 @@ BOOL deleteRecord(Key key){
 		}
 		if (stack-> pageNo == bTreeHeader-> rootPage) {
 			if (KEYCNT(child) == 0 && ISLEAF(child)== FALSE) {
-				/*·çÆ®°¡ ºñ°Ô¸é 0¹øÂ° ÀÚ½ÄÀ» »õ·Î¿î ·çÆ®·Î »ï´Â´Ù */ 				
+				/*ë£¨íŠ¸ê°€ ë¹„ê²Œë©´ 0ë²ˆì§¸ ìì‹ì„ ìƒˆë¡œìš´ ë£¨íŠ¸ë¡œ ì‚¼ëŠ”ë‹¤ */ 				
 				freeBTreePage(child);
 				bTreeHeader-> rootPage= CHILD(child, 0);
 				return TRUE;
@@ -69,7 +69,7 @@ BOOL deleteRecord(Key key){
 }
 
 void mergeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, STACK * stack){
-	/*¸®ÇÁ°¡ ¾Æ´Ñ ³ëµå¸¦ ÇÕº´*/
+	/*ë¦¬í”„ê°€ ì•„ë‹Œ ë…¸ë“œë¥¼ í•©ë³‘*/
 	int j=0;
 	BTreePagePtr temp;
 	if(stack->index == KEYCNT(parent)){
@@ -77,7 +77,6 @@ void mergeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, ST
 		sibling=child;
 		child=temp;
 
-/*** 498 Á¤ÇØ¼º ***/
 		stack-> index--;
 		readBTreePage(CHILD(parent, stack-> index), child);
 	} else {
@@ -95,7 +94,7 @@ void mergeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, ST
 }
 void mergeLeaf(BTreePagePtr child, BTreePagePtr sibling,
 		BTreePagePtr parent, STACK * stack) {
-	/*¸®ÇÁ ³ëµå¸¦ ÇÕº´*/
+	/*ë¦¬í”„ ë…¸ë“œë¥¼ í•©ë³‘*/
 	int j= 0;
 	BTreePagePtr temp;
 	if (stack-> index == KEYCNT(parent)) {
@@ -117,7 +116,7 @@ void mergeLeaf(BTreePagePtr child, BTreePagePtr sibling,
 }
 
 BOOL redistributeLeaf(BTreePagePtr child,BTreePagePtr sibling,BTreePagePtr parent,int i){
-	/*¸®ÇÁ³ëµå¸¦ ÀçºĞ¹è*/
+	/*ë¦¬í”„ë…¸ë“œë¥¼ ì¬ë¶„ë°°*/
 	int moveCount = (KEYCNT(child)+KEYCNT(sibling)) / 2-KEYCNT(child);
 	int j=0;
 	if(RECORD(child,0).key < RECORD(sibling,0).key){
@@ -126,14 +125,14 @@ BOOL redistributeLeaf(BTreePagePtr child,BTreePagePtr sibling,BTreePagePtr paren
 		}
 		KEYCNT(child) += moveCount;
 		KEYCNT(sibling) -= moveCount;
-		/*¿ŞÂÊÀ¸·Î ÀÌµ¿*/
+		/*ì™¼ìª½ìœ¼ë¡œ ì´ë™*/
 		for(j=0;j<KEYCNT(sibling);j++){
 			copyRecord(RECORDPTR(sibling)+moveCount+j,RECORDPTR(sibling)+j);
 		}
 		KEY(parent,i)=RECORD(child,KEYCNT(child)-1).key;
 	}
 	else{
-		/*¿À¸¥ÂÊÀ¸·Î ÀÌµ¿*/
+		/*ì˜¤ë¥¸ìª½ìœ¼ë¡œ ì´ë™*/
 		for(j=KEYCNT(child);j>0;j--){
 			copyRecord(RECORDPTR(child)+j-1,RECORDPTR(child)+moveCount+j-1);
 		}
@@ -151,12 +150,12 @@ BOOL redistributeLeaf(BTreePagePtr child,BTreePagePtr sibling,BTreePagePtr paren
 
 BOOL redistributeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, int i)
 {
-	/*¸®ÇÁ ³ëµå¸¦ ÀçºĞ¹è*/
+	/*ë¦¬í”„ ë…¸ë“œë¥¼ ì¬ë¶„ë°°*/
 	int moveCount= (KEYCNT(child)+KEYCNT(sibling)) / 2-KEYCNT(child);
 	int j= 0;
 	if (KEY(child, 0) < KEY(sibling, 0))
 	{
-		/*Underflow°¡ ÀÏ¾î³­ ³ëµå¸¦ Ã¤¿î´Ù*/
+		/*Underflowê°€ ì¼ì–´ë‚œ ë…¸ë“œë¥¼ ì±„ìš´ë‹¤*/
 		KEY(child, KEYCNT(child))= KEY(parent, i);
 		CHILD(child, KEYCNT(child)+1)= CHILD(sibling, 0);
 		for (j= 0; j < moveCount-1; j++)
@@ -164,9 +163,9 @@ BOOL redistributeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr par
 			copyKey(KEYPTR(sibling, j), KEYPTR(child, KEYCNT(child)+j+1));
 		}
 		KEYCNT(child) += moveCount;
-			/*ºÎ¸ğ ³ëµå·Î Áß°£ Å° °ªÀ» º¹»ç*/
+			/*ë¶€ëª¨ ë…¸ë“œë¡œ ì¤‘ê°„ í‚¤ ê°’ì„ ë³µì‚¬*/
 		KEY(parent, i)= KEY(sibling, moveCount-1);
-			/*ÀçºĞ¹è¿¡ Âü¿©ÇÑ siblingÀ» Á¤¸®*/
+			/*ì¬ë¶„ë°°ì— ì°¸ì—¬í•œ siblingì„ ì •ë¦¬*/
 		KEYCNT(sibling) -= moveCount;
 		CHILD(sibling, 0)= CHILD(sibling, moveCount);
 		for (j=0; j < KEYCNT(sibling); j++)
@@ -176,14 +175,14 @@ BOOL redistributeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr par
 	}
 	else
 	{
-		/*Underflow°¡ ÀÏ¾î³­ ³ëµå¸¦ Á¤¸®*/
+		/*Underflowê°€ ì¼ì–´ë‚œ ë…¸ë“œë¥¼ ì •ë¦¬*/
 		for (j= KEYCNT(child); j > 0; j--)
 		{
 			copyKey(KEYPTR(child, j-1), KEYPTR(child, j-1+moveCount));
 		}
 		CHILD(child, moveCount)= CHILD(child, 0);
 		KEYCNT(child) += moveCount;
-			/*Underflow°¡ ÀÏ¾î³­ ³ëµå¸¦ Ã¤¿î´Ù*/
+			/*Underflowê°€ ì¼ì–´ë‚œ ë…¸ë“œë¥¼ ì±„ìš´ë‹¤*/
 		KEYCNT(sibling) -= moveCount;
 		KEY(child, moveCount-1)= KEY(parent, i);
 		for (j= 0; j < moveCount-1; j++)
@@ -191,18 +190,17 @@ BOOL redistributeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr par
 			copyKey(KEYPTR(sibling, KEYCNT(sibling)+j+1), KEYPTR(child,j));
 		}
 		CHILD(child, 0)= CHILD(sibling, KEYCNT(sibling)+1);
-			/*ºÎ¸ğ ³ëµå·Î Áß°£ Å° °ªÀ» º¹»ç*/
+			/*ë¶€ëª¨ ë…¸ë“œë¡œ ì¤‘ê°„ í‚¤ ê°’ì„ ë³µì‚¬*/
 		KEY(parent, i)= KEY(sibling, KEYCNT(sibling));
 			
 
-/*** 501 ±è¼±Çõ ***/
 }
  writeBTreePage(PAGENO(child), child);
  writeBTreePage(PAGENO(sibling), sibling);
  return TRUE;
 }
 int selectSibling(BTreePagePtr sibling, BTreePagePtr parent, STACK *stack){
-	/*ÀçºĞ¹è¿¡ Âü¿©ÇÏ´Â ÇüÁ¦ ³ëµå¸¦ ¼±ÅÃÇÑ´Ù*/
+	/*ì¬ë¶„ë°°ì— ì°¸ì—¬í•˜ëŠ” í˜•ì œ ë…¸ë“œë¥¼ ì„ íƒí•œë‹¤*/
 	int i= -1;
 	readBTreePage(stack->pageNo, parent);
 	if(stack->index == 0){
