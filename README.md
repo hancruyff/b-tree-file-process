@@ -157,258 +157,188 @@ Key splitLeaf(BTreePagePtr page, BTreeRecord * newRecord, int index) {
 d: 키를 가지는 레코드 삭제
 <details>
 <summary>자세히</summary>
-  
-레코드 존재 확인: 삭제하려는 키가 존재하는지 확인합니다. 존재하지 않으면 함수가 종료됩니다.
-  
-노드 탐색: 삭제할 키가 있는 노드를 찾기 위해 스택을 사용하여 트리를 탐색합니다.
 
-레코드 삭제: 키가 있는 노드에서 레코드를 삭제합니다.
+레코드 존재 확인: 삭제하려는 키가 존재하는지 확인합니다. 존재하지 않으면 함수가 종료.
 
-언더플로우 처리: 노드에서 레코드를 삭제한 후, 노드의 키 수가 최소 허용치를 밑돌면 형제 노드와 합병하거나 키를 재분배합니다.
+노드 탐색: 삭제할 키가 있는 노드를 찾기 위해 스택을 사용하여 트리를 탐색.
 
-루트 노드 처리: 루트 노드가 비게 되면 새로운 루트를 설정합니다
-  <details>
-  <summary>코드 펼치기</summary>
+레코드 삭제: 키가 있는 노드에서 레코드를 삭제.
+
+언더플로우 처리: 노드에서 레코드를 삭제한 후, 노드의 키 수가 최소 허용치를 밑돌면 형제 노드와 합병하거나 키를 재분배.
+
+루트 노드 처리: 루트 노드가 비게 되면 새로운 루트를 설정.
+<details>
+<summary>코드 펼치기</summary>
+
+ ```
+ BOOL deleteRecord(Key key) {
+    int i = 0;
+    BOOL finished = FALSE, ret;
+    STACK *stack;
+    BTreePagePtr child = (BTreePagePtr)malloc(bufferManager->pageSize); 
+    BTreePagePtr sibling = (BTreePagePtr)malloc(bufferManager->pageSize); 
+    BTreePagePtr parent = (BTreePagePtr)malloc(bufferManager->pageSize); 
+
+    if (findRecord(key, child) == FALSE) return FALSE;  // 레코드 존재 확인
+
+    while (!finished) {
+        stack = pop();  // 현재 탐색 경로를 스택에서 꺼냄
+
+        if (ISLEAF(child)) {
+            ret = removeRecord(child, stack->index);  // 리프 노드에서 레코드 삭제
+        } else {
+            ret = removeKey(child, stack->index);  // 내부 노드에서 키 삭제
+        }
+
+        if (stack->pageNo == bTreeHeader->rootPage) {
+            // 루트 노드가 비어 있는 경우
+            if (KEYCNT(child) == 0 && !ISLEAF(child)) {
+                freeBTreePage(child);
+                bTreeHeader->rootPage = CHILD(child, 0);  // 새로운 루트 설정
+                return TRUE;
+            }
+            finished = TRUE;  // 삭제 완료
+        } else if (KEYCNT(child) < MIN(child)) { 
+            stack = peek();  // 부모 노드 확인
+
+            i = selectSibling(sibling, parent, stack);  // 형제 노드 선택
+            if (i == -1) {
+                // 형제 노드와 합병
+                if (ISLEAF(child)) {
+                    mergeLeaf(child, sibling, parent, stack);
+                } else {
+                    mergeNode(child, sibling, parent, stack);
+                }
+            } else {
+                // 형제 노드와 키 재분배
+                if (ISLEAF(child)) {
+                    redistributeLeaf(child, sibling, parent, i);
+                } else {
+                    redistributeNode(child, sibling, parent, i);
+                }
+                finished = TRUE;  // 재분배 완료
+            }
+            temp = child;
+            child = parent;
+            parent = temp;
+        } else {
+            finished = TRUE;  // 삭제 완료
+        }
+    }
+
+    writeBTreePage(PAGENO(child), child);  // 변경사항 디스크에 기록
+    free(child);
+    free(sibling);
+    free(parent);
+    return TRUE;  // 삭제 성공
+}
+ ```
+구현 내용
+
+```
+void mergeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, STACK *stack) {
+    int j = 0;
+    BTreePagePtr temp;
+    if (stack->index == KEYCNT(parent)) {
+        temp = sibling;
+        sibling = child;
+        child = temp;
+        stack->index--;  // 형제 노드 인덱스 조정
+        readBTreePage(CHILD(parent, stack->index), child);  // 부모의 자식 노드 읽기
+    } else {
+        readBTreePage(CHILD(parent, stack->index + 1), sibling);  // 형제 노드 읽기
+    }
     
-    ```
-    #include "BTree.h"
-extern BufferManager * bufferManager;
-extern BTreeHeader * bTreeHeader;
-void mergeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, STACK * stack);
-	/*리프가 아닌 노드를 합병*/
-void mergeLeaf(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, STACK * stack); 
-	/*리프 노드를 합병*/
-BOOL redistributeLeaf(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, int i);
-	/*리프가 아닌 노드를 재분배*/
-BOOL redistributeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, int i);
-	/*리프 노드를 재분배*/ 
-int selectSibling(BTreePagePtr sibling, BTreePagePtr parent, STACK * stack);
-	/*재분배에 참여하는 형제노드를 선택한다*/
-BOOL deleteRecord(Key key){
-	/*key를 갖는 레코드 삭제*/
-	int i= 0;
-	BOOL finished= FALSE, ret;
-	STACK * stack;
-	BTreePagePtr child 	= (BTreePagePtr)malloc(bufferManager-> pageSize); 
-	BTreePagePtr sibling 	= (BTreePagePtr)malloc(bufferManager-> pageSize); 
-	BTreePagePtr parent 	= (BTreePagePtr)malloc(bufferManager-> pageSize); 
-	BTreePagePtr temp;
-	if (findRecord(key, child) ==FALSE) return FALSE;
-	while (finished == FALSE) {
-		stack= pop(); 
-		if (ISLEAF(child)) {
-			ret= removeRecord(child, stack->index);
-		} else {
-			ret= removeKey(child, stack->index);
-		}
-		if (stack-> pageNo == bTreeHeader-> rootPage) {
-			if (KEYCNT(child) == 0 && ISLEAF(child)== FALSE) {
-				/*루트가 비게면 0번째 자식을 새로운 루트로 삼는다 */ 				
-				freeBTreePage(child);
-				bTreeHeader-> rootPage= CHILD(child, 0);
-				return TRUE;
-			}		
-			finished= TRUE;
-		} else if (KEYCNT(child) < MIN(child)) { 
-			stack= peek();
-			
-			i=selectSibling(sibling, parent, stack);
-	if (i == -1) {
-		if(ISLEAF(child)){
-			mergeLeaf(child, sibling, parent, stack);
-		}else{
-			mergeNode(child, sibling, parent, stack);
-		}
-	}else{
-		if(ISLEAF(child)){
-		redistributeLeaf(child, sibling, parent,i);
-		}else{
-		redistributeNode(child, sibling, parent, i);
-		}
-		finished=TRUE;
-	}
-	temp=child;
-	child=parent;
-	parent=temp;
-}else{
-	finished=TRUE;
-  }
-}
-	writeBTreePage(PAGENO(child),child);
-	free(child);
-	free(sibling);
-	free(parent);
-	return TRUE;
-}
+    // 부모 노드의 키를 자식 노드에 추가
+    KEY(child, KEYCNT(child)) = KEY(parent, stack->index);
+    CHILD(child, KEYCNT(child) + 1) = CHILD(sibling, 0);
+    KEYCNT(child)++;  // 자식 노드 키 수 증가
 
-void mergeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, STACK * stack){
-	/*리프가 아닌 노드를 합병*/
-	int j=0;
-	BTreePagePtr temp;
-	if(stack->index == KEYCNT(parent)){
-		temp=sibling;
-		sibling=child;
-		child=temp;
+    // 형제 노드의 키를 자식 노드로 복사
+    for (j = 0; j < KEYCNT(sibling); j++) {
+        copyKey(KEYPTR(sibling, j), KEYPTR(child, KEYCNT(child)));
+        KEYCNT(child)++;
+    }
 
-		stack-> index--;
-		readBTreePage(CHILD(parent, stack-> index), child);
-	} else {
-		readBTreePage(CHILD(parent, stack-> index+1), sibling);
-	}
-	KEY(child, KEYCNT(child))= KEY(parent, stack-> index);
-	CHILD(child, KEYCNT(child)+1)= CHILD(sibling, 0);
-	KEYCNT(child) ++;
-	for(j= 0; j < KEYCNT(sibling); j++) {
-		copyKey(KEYPTR(sibling, j), KEYPTR(child, KEYCNT(child)));
-		KEYCNT(child) ++;
-	}
-	writeBTreePage(PAGENO(child), child);
-	freeBTreePage(sibling);
+    writeBTreePage(PAGENO(child), child);  // 변경사항 디스크에 기록
+    freeBTreePage(sibling);  // 형제 노드 메모리 해제
 }
-void mergeLeaf(BTreePagePtr child, BTreePagePtr sibling,
-		BTreePagePtr parent, STACK * stack) {
-	/*리프 노드를 합병*/
-	int j= 0;
-	BTreePagePtr temp;
-	if (stack-> index == KEYCNT(parent)) {
-		temp= sibling;
-		sibling= child;
-		child= temp;
-		stack->index--;
-		readBTreePage(CHILD(parent, stack-> index), child);
-	} else {
-		readBTreePage(CHILD(parent, stack-> index+1), sibling);
-	}
-	for (j= 0; j < KEYCNT(sibling); j++) {
-		copyRecord(RECORDPTR(sibling)+j, RECORDPTR(child)+KEYCNT(child));
-		KEYCNT(child) ++;
-	}
-	NEXT(child)= NEXT(sibling);
-	writeBTreePage(PAGENO(child), child);
-	freeBTreePage(sibling);
-}
+```
+노드 합병 함수
 
-BOOL redistributeLeaf(BTreePagePtr child,BTreePagePtr sibling,BTreePagePtr parent,int i){
-	/*리프노드를 재분배*/
-	int moveCount = (KEYCNT(child)+KEYCNT(sibling)) / 2-KEYCNT(child);
-	int j=0;
-	if(RECORD(child,0).key < RECORD(sibling,0).key){
-		for(j=0;j<moveCount;j++){
-			copyRecord(RECORDPTR(sibling)+j,RECORDPTR(child)+KEYCNT(child)+j);
-		}
-		KEYCNT(child) += moveCount;
-		KEYCNT(sibling) -= moveCount;
-		/*왼쪽으로 이동*/
-		for(j=0;j<KEYCNT(sibling);j++){
-			copyRecord(RECORDPTR(sibling)+moveCount+j,RECORDPTR(sibling)+j);
-		}
-		KEY(parent,i)=RECORD(child,KEYCNT(child)-1).key;
-	}
-	else{
-		/*오른쪽으로 이동*/
-		for(j=KEYCNT(child);j>0;j--){
-			copyRecord(RECORDPTR(child)+j-1,RECORDPTR(child)+moveCount+j-1);
-		}
-		KEYCNT(child) += moveCount;
-		KEYCNT(sibling) -= moveCount;
-		for(j=0;j<moveCount;j++){
-			copyRecord(RECORDPTR(sibling)+KEYCNT(sibling)+j,RECORDPTR(child)+j);
-		}
-		KEY(parent,i)=RECORD(sibling,KEYCNT(sibling)-1).key;
-	}
-	writeBTreePage(PAGENO(child),child);
-	writeBTreePage(PAGENO(sibling),sibling);
-	return TRUE;
-}
+목적: 리프가 아닌 노드를 합병하여 새로운 노드로 만든 후, 부모 노드의 키를 포함.
 
-BOOL redistributeNode(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, int i)
-{
-	/*리프 노드를 재분배*/
-	int moveCount= (KEYCNT(child)+KEYCNT(sibling)) / 2-KEYCNT(child);
-	int j= 0;
-	if (KEY(child, 0) < KEY(sibling, 0))
-	{
-		/*Underflow가 일어난 노드를 채운다*/
-		KEY(child, KEYCNT(child))= KEY(parent, i);
-		CHILD(child, KEYCNT(child)+1)= CHILD(sibling, 0);
-		for (j= 0; j < moveCount-1; j++)
-		{
-			copyKey(KEYPTR(sibling, j), KEYPTR(child, KEYCNT(child)+j+1));
-		}
-		KEYCNT(child) += moveCount;
-			/*부모 노드로 중간 키 값을 복사*/
-		KEY(parent, i)= KEY(sibling, moveCount-1);
-			/*재분배에 참여한 sibling을 정리*/
-		KEYCNT(sibling) -= moveCount;
-		CHILD(sibling, 0)= CHILD(sibling, moveCount);
-		for (j=0; j < KEYCNT(sibling); j++)
-		{
-			copyKey(KEYPTR(sibling, moveCount+j), KEYPTR(sibling, j));
-		}
-	}
-	else
-	{
-		/*Underflow가 일어난 노드를 정리*/
-		for (j= KEYCNT(child); j > 0; j--)
-		{
-			copyKey(KEYPTR(child, j-1), KEYPTR(child, j-1+moveCount));
-		}
-		CHILD(child, moveCount)= CHILD(child, 0);
-		KEYCNT(child) += moveCount;
-			/*Underflow가 일어난 노드를 채운다*/
-		KEYCNT(sibling) -= moveCount;
-		KEY(child, moveCount-1)= KEY(parent, i);
-		for (j= 0; j < moveCount-1; j++)
-		{
-			copyKey(KEYPTR(sibling, KEYCNT(sibling)+j+1), KEYPTR(child,j));
-		}
-		CHILD(child, 0)= CHILD(sibling, KEYCNT(sibling)+1);
-			/*부모 노드로 중간 키 값을 복사*/
-		KEY(parent, i)= KEY(sibling, KEYCNT(sibling));
-			
+구현: 형제 노드의 키를 현재 노드로 복사하고, 부모 노드의 키를 추가
 
+```
+void mergeLeaf(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, STACK *stack) {
+    int j = 0;
+    BTreePagePtr temp;
+    if (stack->index == KEYCNT(parent)) {
+        temp = sibling;
+        sibling = child;
+        child = temp;
+        stack->index--;  // 형제 노드 인덱스 조정
+        readBTreePage(CHILD(parent, stack->index), child);  // 부모의 자식 노드 읽기
+    } else {
+        readBTreePage(CHILD(parent, stack->index + 1), sibling);  // 형제 노드 읽기
+    }
+
+    // 형제 노드의 레코드를 현재 노드로 복사
+    for (j = 0; j < KEYCNT(sibling); j++) {
+        copyRecord(RECORDPTR(sibling) + j, RECORDPTR(child) + KEYCNT(child));
+        KEYCNT(child)++;
+    }
+
+    NEXT(child) = NEXT(sibling);  // 다음 노드 연결
+    writeBTreePage(PAGENO(child), child);  // 변경사항 디스크에 기록
+    freeBTreePage(sibling);  // 형제 노드 메모리 해제
 }
- writeBTreePage(PAGENO(child), child);
- writeBTreePage(PAGENO(sibling), sibling);
- return TRUE;
+```
+목적: 리프 노드를 합병하여 새로운 노드로 만든 후, 형제 노드의 레코드를 포함.
+
+구현: 형제 노드의 모든 레코드를 현재 노드로 복사하고, 다음 노드를 연결.
+
+```
+BOOL redistributeLeaf(BTreePagePtr child, BTreePagePtr sibling, BTreePagePtr parent, int i) {
+    int moveCount = (KEYCNT(child) + KEYCNT(sibling)) / 2 - KEYCNT(child);
+    int j = 0;
+
+    if (RECORD(child, 0).key < RECORD(sibling, 0).key) {
+        // 왼쪽으로 이동
+        for (j = 0; j < moveCount; j++) {
+            copyRecord(RECORDPTR(sibling) + j, RECORDPTR(child) + KEYCNT(child) + j);
+        }
+        KEYCNT(child) += moveCount;
+        KEYCNT(sibling) -= moveCount;
+        for (j = 0; j < KEYCNT(sibling); j++) {
+            copyRecord(RECORDPTR(sibling) + moveCount + j, RECORDPTR(sibling) + j);
+        }
+        KEY(parent, i) = RECORD(child, KEYCNT(child) - 1).key;  // 부모 노드 키 업데이트
+    } else {
+        // 오른쪽으로 이동
+        for (j = KEYCNT(child); j > 0; j--) {
+            copyRecord(RECORDPTR(child) + j - 1, RECORDPTR(child) + moveCount + j - 1);
+        }
+        KEYCNT(child) += moveCount;
+        KEYCNT(sibling) -= moveCount;
+        for (j = 0; j < moveCount; j++) {
+            copyRecord(RECORDPTR(sibling) + KEYCNT(sibling) + j, RECORDPTR(child) + j);
+        }
+        KEY(parent, i) = RECORD(sibling, KEYCNT(sibling) - 1).key;  // 부모 노드 키 업데이트
+    }
+
+    writeBTreePage(PAGENO(child), child);  // 변경사항 디스크에 기록
+    writeBTreePage(PAGENO(sibling), sibling);  // 변경사항 디스크에 기록
+    return TRUE;
 }
-int selectSibling(BTreePagePtr sibling, BTreePagePtr parent, STACK *stack){
-	/*재분배에 참여하는 형제 노드를 선택한다*/
-	int i= -1;
-	readBTreePage(stack->pageNo, parent);
-	if(stack->index == 0){
-		readBTreePage(CHILD(parent, 1), sibling);
-		if (KEYCNT(sibling)
-		>(ISLEAF(sibling)? bTreeHeader->minRecord:bTreeHeader->minKey)){
-			i= stack->index;
-		}
-	}else if (stack->index == KEYCNT(parent)){
-		readBTreePage(CHILD(parent, stack->index-1), sibling);
-		if(KEYCNT(sibling)
-			> (ISLEAF(sibling) ?bTreeHeader->minRecord:bTreeHeader -> minKey)){
-				i= stack -> index-1;
-		}
-	}else {
-		readBTreePage(CHILD(parent, stack->index+1), sibling);
-		if(KEYCNT(sibling)
-			> (ISLEAF(sibling)
-			? bTreeHeader-> minRecord
-			: bTreeHeader-> minKey)){
-				i= stack-> index;
-		}else{
-			readBTreePage(CHILD(parent, stack->index-1), sibling);
-			if(KEYCNT(sibling)
-				>(ISLEAF(sibling)
-				? bTreeHeader-> minRecord
-				: bTreeHeader-> minKey)){
-					i= stack->index-1;
-			}
-		}
-	}
-	return i;
-}
-    ```
-  </details>
+```
+노드 재분배 함수
+
+목적: 리프 노드 간에 레코드를 재분배하여 언더플로우를 방지합니다.
+
+구현: 형제 노드와의 키 수에 따라 레코드를 왼쪽 또는 오른쪽으로 이동.
+</details>
 </details>
 r: 키를 가지는 레코드 검색
 <details>
